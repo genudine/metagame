@@ -1,4 +1,4 @@
-FROM rust:1.69.0-bullseye as rust-base
+FROM ghcr.io/rust-lang/rust:nightly-bullseye as rust-base
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends curl clang
 ARG MOLD_VERSION=1.11.0
