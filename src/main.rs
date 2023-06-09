@@ -28,7 +28,7 @@ async fn main() {
     let app = Router::new()
         .layer(tower_http::trace::TraceLayer::new_for_http())
         .route("/:world", get(get_one_world))
-        // .route("/all", get(get_all_worlds))
+        .route("/all", get(get_all_worlds))
         .route("/", get(root))
         .with_state(sled::open("/tmp/metagame").expect("open"));
 
