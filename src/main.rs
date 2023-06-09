@@ -33,7 +33,7 @@ async fn main() {
         .with_state(sled::open("/tmp/metagame").expect("open"));
 
     let addr = SocketAddr::from((
-        [127, 0, 0, 1],
+        [0, 0, 0, 0],
         env::var("PORT")
             .unwrap_or("8076".to_string())
             .parse()
