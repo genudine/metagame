@@ -9,7 +9,6 @@ use axum::{
 };
 use std::{env, net::SocketAddr};
 use tokio::task::JoinSet;
-use tracing::Level;
 use types::{World, Zone};
 use zones::get_zone_states;
 
@@ -25,12 +24,27 @@ async fn main() {
         // .with_max_level(Level::DEBUG)
         .init();
 
+    let db = sled::open("/tmp/metagame").expect("open");
+
     let app = Router::new()
         .layer(tower_http::trace::TraceLayer::new_for_http())
         .route("/:world", get(get_one_world))
         .route("/all", get(get_all_worlds))
         .route("/", get(root))
-        .with_state(sled::open("/tmp/metagame").expect("open"));
+        .with_state(db.clone());
+
+    tokio::spawn(async move {
+        loop {
+            let mut set = JoinSet::new();
+            for world in vec![1, 10, 13, 17, 19, 40, 1000, 2000] {
+                set.spawn(get_world(db.clone(), world, true));
+            }
+
+            while let Some(_) = set.join_next().await {}
+
+            tokio::time::sleep(tokio::time::Duration::from_secs(60 * 3)).await;
+        }
+    });
 
     let addr = SocketAddr::from((
         [0, 0, 0, 0],
@@ -51,7 +65,7 @@ async fn root() -> Html<&'static str> {
 }
 
 pub async fn get_one_world(State(db): State<sled::Db>, Path(world): Path<i32>) -> Json<World> {
-    Json(get_world(db, world).await)
+    Json(get_world(db, world, false).await)
 }
 
 pub async fn get_all_worlds(State(db): State<sled::Db>) -> Json<Vec<World>> {
@@ -59,7 +73,7 @@ pub async fn get_all_worlds(State(db): State<sled::Db>) -> Json<Vec<World>> {
     let mut worlds = vec![World::default(); 8];
 
     for world in vec![1, 10, 13, 17, 19, 40, 1000, 2000] {
-        set.spawn(get_world(db.clone(), world));
+        set.spawn(get_world(db.clone(), world, false));
     }
 
     let mut i = 0;
@@ -71,10 +85,12 @@ pub async fn get_all_worlds(State(db): State<sled::Db>) -> Json<Vec<World>> {
     Json(worlds)
 }
 
-pub async fn get_world(db: sled::Db, world: i32) -> World {
-    match world_from_cache(db.clone(), world) {
-        Ok(response) => return response,
-        _ => {}
+pub async fn get_world(db: sled::Db, world: i32, skip_cache: bool) -> World {
+    if !skip_cache {
+        match world_from_cache(db.clone(), world) {
+            Ok(response) => return response,
+            _ => {}
+        }
     }
 
     let alerts = get_alerts(world).await.unwrap();
@@ -112,7 +128,7 @@ fn world_from_cache(db: sled::Db, world: i32) -> Result<World, ()> {
 
     match bincode::deserialize::<World>(&value) {
         Ok(response) => {
-            if response.cached_at + chrono::Duration::minutes(3) < chrono::Utc::now() {
+            if response.cached_at + chrono::Duration::minutes(5) < chrono::Utc::now() {
                 return Err(());
             }
             Ok(response)
