@@ -15,9 +15,9 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - run: docker buildx create --use --driver=docker-container
       - run: |
-          TAG_LATEST_IF_MASTER=$(if [ "$GITHUB_REF_NAME" = "main" ]; then echo "-t ghcr.io/${{ github.repository }}/agg-population:latest"; else echo ""; fi)
+          TAG_LATEST_IF_MASTER=$(if [ "$GITHUB_REF_NAME" = "main" ]; then echo "-t ghcr.io/${{ github.repository }}/metagame:latest"; else echo ""; fi)
           docker buildx build . \
-            -t ghcr.io/${{ github.repository }}/agg-population:${{ github.sha }} $TAG_LATEST_IF_MASTER \
+            -t ghcr.io/${{ github.repository }}/metagame:${{ github.sha }} $TAG_LATEST_IF_MASTER \
             --push \
-            --cache-to type=gha,scope=$GITHUB_REF_NAME-agg-population \
-            --cache-from type=gha,scope=$GITHUB_REF_NAME-agg-population
+            --cache-to type=gha,scope=$GITHUB_REF_NAME-metagame \
+            --cache-from type=gha,scope=$GITHUB_REF_NAME-metagame
