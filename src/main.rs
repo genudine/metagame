@@ -10,6 +10,7 @@ use axum::{
 use r2d2_sqlite::{rusqlite::params, SqliteConnectionManager};
 use std::{env, net::SocketAddr};
 use tokio::task::JoinSet;
+use tower_http::trace::TraceLayer;
 use types::{World, Zone};
 use zones::get_zone_states;
 
@@ -22,12 +23,11 @@ mod zones;
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt()
-        // .with_max_level(Level::DEBUG)
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::from_default_env()
+                .add_directive("tower_http=trace".parse().unwrap()),
+        )
         .init();
-
-    // let db = sqlite::Connection::open_with_full_mutex(":memory:").unwrap();
-    // db.execute("CREATE TABLE worlds (id INTEGER NOT NULL PRIMARY KEY, data BLOB);")
-    //     .unwrap();
 
     let sqlite_manager = SqliteConnectionManager::memory();
     let pool = r2d2::Pool::new(sqlite_manager).unwrap();
@@ -40,20 +40,17 @@ async fn main() {
         .unwrap();
 
     let app = Router::new()
-        .layer(tower_http::trace::TraceLayer::new_for_http())
         .route("/:world", get(get_one_world))
         .route("/all", get(get_all_worlds))
         .route("/", get(root))
+        .layer(TraceLayer::new_for_http())
         .with_state(pool.clone());
 
     tokio::spawn(async move {
         loop {
-            let mut set = JoinSet::new();
             for world in vec![1, 10, 13, 17, 19, 40, 1000, 2000] {
-                set.spawn(get_world(pool.clone(), world, true));
+                tokio::spawn(get_world(pool.clone(), world, true));
             }
-
-            while let Some(_) = set.join_next().await {}
 
             tokio::time::sleep(tokio::time::Duration::from_secs(60 * 3)).await;
         }
@@ -103,11 +100,14 @@ pub async fn get_all_worlds(
     Json(worlds)
 }
 
+#[tracing::instrument(skip(db))]
 pub async fn get_world(
     db: r2d2::Pool<SqliteConnectionManager>,
     world: i32,
     skip_cache: bool,
 ) -> World {
+    tracing::debug!("Getting world {}", world);
+
     if !skip_cache {
         match world_from_cache(db.clone(), world) {
             Ok(response) => return response,
@@ -141,26 +141,35 @@ pub async fn get_world(
     response
 }
 
+#[tracing::instrument(skip(db))]
 fn world_from_cache(db: r2d2::Pool<SqliteConnectionManager>, world: i32) -> Result<World, ()> {
     let db = db.get().unwrap();
     let mut query = db.prepare("SELECT data FROM worlds WHERE id = ?").unwrap();
     let value: Result<Vec<u8>, _> = query.query_row(params![world], |r| r.get(0));
 
     if value.is_err() {
+        tracing::debug!("Cache miss (non-exist) for world {}", world);
         return Err(());
     }
 
     match bincode::deserialize::<World>(value.unwrap().as_slice()) {
         Ok(response) => {
             if response.cached_at + chrono::Duration::minutes(5) < chrono::Utc::now() {
+                tracing::debug!("Cache miss (expired) for world {}", world);
                 return Err(());
             }
+
+            tracing::debug!("Cache hit for world {}", world);
             Ok(response)
         }
-        _ => Err(()),
+        _ => {
+            tracing::debug!("Cache miss (corrupt) for world {}", world);
+            Err(())
+        }
     }
 }
 
+#[tracing::instrument(skip(db, response))]
 fn world_to_cache(db: r2d2::Pool<SqliteConnectionManager>, world: i32, response: &World) {
     let value = bincode::serialize(response).unwrap();
     let db = db.get().unwrap();

@@ -27,7 +27,7 @@ pub async fn get_alerts(world_id: i32) -> Result<Vec<Alert>, ()> {
 
     for world_event in world_events.world_event_list {
         let alert = alerts.entry(world_event.id).or_insert(Alert {
-            id: world_event.metagame_event_id,
+            id: world_event.id,
             zone: world_event.zone_id,
             end_time: None,
             start_time: None,
