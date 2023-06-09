@@ -19,3 +19,4 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 chrono = { version = "0.4", features = ["serde"] }
 lazy_static = "1.4"
 serde-aux = "4"
+bincode = "1.3"

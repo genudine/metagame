@@ -3,7 +3,7 @@ use crate::{
     types::{FactionPercents, Zone},
 };
 use lazy_static::lazy_static;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_aux::prelude::*;
 use std::collections::HashMap;
 
@@ -48,7 +48,7 @@ pub async fn get_zone_states(world_id: i32) -> Result<Vec<Zone>, ()> {
             id: map_zone.zone_id,
             locked: warpgate_factions[0] == warpgate_factions[1]
                 && warpgate_factions[1] == warpgate_factions[2],
-            faction_control: calculate_faction_percents(&map_zone.regions.row),
+            territory: calculate_faction_percents(&map_zone.regions.row),
             alert: None,
         };
 
@@ -61,17 +61,36 @@ pub async fn get_zone_states(world_id: i32) -> Result<Vec<Zone>, ()> {
 fn calculate_faction_percents(regions: &Vec<MapRegionRowData>) -> FactionPercents {
     let groups = regions.group_by(|a, b| a.row_data.faction_id == b.row_data.faction_id);
 
-    let mut faction_percents = FactionPercents {
+    struct FactionTotals {
+        vs: f32,
+        nc: f32,
+        tr: f32,
+    }
+
+    let mut faction_totals = FactionTotals {
         vs: 0.0,
         nc: 0.0,
         tr: 0.0,
     };
 
-    for faction in groups {
-        faction.
+    for row in groups {
+        let faction_id = row[0].row_data.faction_id;
+
+        match faction_id {
+            1 => faction_totals.vs += 1.0,
+            2 => faction_totals.nc += 1.0,
+            3 => faction_totals.tr += 1.0,
+            _ => (),
+        }
     }
 
-    faction_percents
+    let total = faction_totals.vs + faction_totals.nc + faction_totals.tr;
+
+    FactionPercents {
+        vs: faction_totals.vs / total * 100.0,
+        nc: faction_totals.nc / total * 100.0,
+        tr: faction_totals.tr / total * 100.0,
+    }
 }
 
 #[derive(Deserialize)]

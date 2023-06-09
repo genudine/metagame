@@ -1,18 +1,12 @@
-use crate::{alert_types::alert_type, misc};
-use chrono::{DateTime, TimeZone, Utc};
-use serde::{Deserialize, Serialize};
+use crate::{
+    alert_types::alert_type,
+    misc,
+    types::{Alert, FactionPercents},
+};
+use chrono::{TimeZone, Utc};
+use serde::Deserialize;
 use serde_aux::prelude::*;
 use std::collections::HashMap;
-
-#[derive(Serialize)]
-pub struct Alert {
-    pub id: i32,
-    pub zone: i32,
-    pub end_time: Option<DateTime<Utc>>,
-    pub start_time: Option<DateTime<Utc>>,
-    pub alert_type: String,
-    pub ps2alerts: String,
-}
 
 pub async fn get_alerts(world_id: i32) -> Result<Vec<Alert>, ()> {
     let response = reqwest::get(format!(
@@ -42,6 +36,11 @@ pub async fn get_alerts(world_id: i32) -> Result<Vec<Alert>, ()> {
                 "https://ps2alerts.com/alert/{}-{}",
                 world_id, world_event.id
             ),
+            percentages: FactionPercents {
+                nc: world_event.faction_nc,
+                tr: world_event.faction_tr,
+                vs: world_event.faction_vs,
+            },
         });
 
         if world_event.metagame_event_state_name == "started" {
@@ -81,4 +80,10 @@ struct WorldEvent {
     timestamp: i64,
     #[serde(deserialize_with = "deserialize_number_from_string")]
     zone_id: i32,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    faction_nc: f32,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    faction_tr: f32,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    faction_vs: f32,
 }
