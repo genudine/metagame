@@ -8,9 +8,9 @@ use serde::Deserialize;
 use serde_aux::prelude::*;
 use std::collections::HashMap;
 
-pub async fn get_alerts(world_id: i32) -> Result<Vec<Alert>, ()> {
+pub async fn get_alerts(world_id: i32) -> Result<(Vec<Alert>, Vec<Alert>), ()> {
     let response = reqwest::get(format!(
-        "https://census.daybreakgames.com/s:{}/get/{}/world_event/?world_id={}&type=METAGAME&c:limit=10",
+        "https://census.daybreakgames.com/s:{}/get/{}/world_event/?world_id={}&type=METAGAME&c:limit=15",
         misc::service_id(),
         misc::platform(world_id),
         world_id
@@ -50,15 +50,14 @@ pub async fn get_alerts(world_id: i32) -> Result<Vec<Alert>, ()> {
         }
     }
 
-    let mut active_alerts: Vec<Alert> = vec![];
+    let alerts: Vec<Alert> = alerts.into_iter().map(|(_, v)| v).collect();
+    let active_alerts: Vec<Alert> = alerts
+        .clone()
+        .into_iter()
+        .filter(|alert| alert.end_time.is_none())
+        .collect();
 
-    for (_, alert) in alerts {
-        if alert.end_time.is_none() {
-            active_alerts.push(alert);
-        }
-    }
-
-    Ok(active_alerts)
+    Ok((active_alerts, alerts))
 }
 
 #[derive(Deserialize)]

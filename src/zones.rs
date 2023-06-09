@@ -50,6 +50,7 @@ pub async fn get_zone_states(world_id: i32) -> Result<Vec<Zone>, ()> {
                 && warpgate_factions[1] == warpgate_factions[2],
             territory: calculate_faction_percents(&map_zone.regions.row),
             alert: None,
+            locked_since: None,
         };
 
         zones.push(zone);

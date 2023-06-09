@@ -115,16 +115,25 @@ pub async fn get_world(
         }
     }
 
-    let alerts = get_alerts(world).await.unwrap();
+    let (active_alerts, most_recent_alerts) = get_alerts(world).await.unwrap();
     let zones = get_zone_states(world).await.unwrap();
 
     let converged_zones: Vec<Zone> = zones
         .into_iter()
         .map(|zone| {
             let mut zone = zone;
-            let alert = alerts.iter().find(|alert| alert.zone == zone.id);
+            let alert = active_alerts.iter().find(|alert| alert.zone == zone.id);
 
             zone.alert = alert.cloned();
+
+            if zone.locked {
+                zone.locked_since = most_recent_alerts
+                    .iter()
+                    .find(|alert| alert.zone == zone.id)
+                    .cloned()
+                    .unwrap()
+                    .end_time
+            }
 
             zone
         })

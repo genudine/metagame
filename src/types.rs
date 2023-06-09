@@ -14,6 +14,7 @@ pub struct Zone {
     pub locked: bool,
     pub alert: Option<Alert>,
     pub territory: FactionPercents,
+    pub locked_since: Option<DateTime<Utc>>,
 }
 
 #[derive(Deserialize, Serialize, Clone, Default, Debug)]
