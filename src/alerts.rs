@@ -50,14 +50,36 @@ pub async fn get_alerts(world_id: i32) -> Result<(Vec<Alert>, Vec<Alert>), ()> {
         }
     }
 
-    let alerts: Vec<Alert> = alerts.into_iter().map(|(_, v)| v).collect();
+    let alerts = alerts
+        .into_iter()
+        .map(|(_, alert)| alert)
+        .collect::<Vec<Alert>>();
+
+    let newest_alert_by_zone = alerts
+        .clone()
+        .into_iter()
+        .fold(HashMap::<i32, Alert>::new(), |mut map, alert| {
+            if let Some(current_alert) = map.get_mut(&alert.zone) {
+                if alert.start_time > current_alert.start_time {
+                    *current_alert = alert;
+                }
+            } else {
+                map.insert(alert.zone, alert);
+            }
+
+            map
+        })
+        .into_iter()
+        .map(|(_, alert)| alert)
+        .collect::<Vec<Alert>>();
+
     let active_alerts: Vec<Alert> = alerts
         .clone()
         .into_iter()
         .filter(|alert| alert.end_time.is_none())
         .collect();
 
-    Ok((active_alerts, alerts))
+    Ok((active_alerts, newest_alert_by_zone))
 }
 
 #[derive(Deserialize)]
