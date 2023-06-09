@@ -127,12 +127,13 @@ pub async fn get_world(
             zone.alert = alert.cloned();
 
             if zone.locked {
-                zone.locked_since = most_recent_alerts
+                zone.locked_since = match most_recent_alerts
                     .iter()
                     .find(|alert| alert.zone == zone.id)
-                    .cloned()
-                    .unwrap()
-                    .end_time
+                {
+                    Some(alert) => alert.end_time,
+                    None => None,
+                };
             }
 
             zone
